@@ -9,3 +9,5 @@
 lib-*.aar
 /Release
 /docs
+# Yaxin Box embedded server bundle (regenerate via scripts/bundle-server-for-android.sh)
+app/src/main/assets/nodejs-project/
