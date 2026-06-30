@@ -1,0 +1,76 @@
+package wang.yaxin.box;
+
+import android.content.Context;
+
+import com.github.catvod.crawler.Spider;
+import com.github.catvod.net.OkHttp;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import okhttp3.Response;
+
+/**
+ * Loads TVBox `csp_` jar spiders at runtime (Android ART) against the real catvod
+ * {@link Spider} base (from the :catvod module), so they run exactly as in TVBox.
+ *
+ * The Yaxin Box Node server registers each csp_ site once (jar URL + api + ext); the
+ * spider is then driven by key.
+ */
+public final class JarSpiderHost {
+
+    private final Context context;
+    private final Map<String, Spider> spiders = new ConcurrentHashMap<>();
+    private final Map<String, ClassLoader> loaders = new ConcurrentHashMap<>();
+
+    public JarSpiderHost(Context context) {
+        this.context = context.getApplicationContext();
+    }
+
+    /** api e.g. "csp_XiaoYa"; jar e.g. "http://host/spider.jar;md5;abc" (suffix ignored). */
+    public synchronized Spider register(String key, String api, String ext, String jar) throws Exception {
+        Spider existing = spiders.get(key);
+        if (existing != null) return existing;
+        File jarFile = downloadJar(jar);
+        ClassLoader loader = loaderFor(jarFile);
+        String className = api.startsWith("csp_") ? "com.github.catvod.spider." + api.substring(4) : api;
+        Spider spider = (Spider) loader.loadClass(className).getDeclaredConstructor().newInstance();
+        spider.init(context, ext == null ? "" : ext);
+        spiders.put(key, spider);
+        return spider;
+    }
+
+    public Spider get(String key) {
+        return spiders.get(key);
+    }
+
+    private ClassLoader loaderFor(File jarFile) {
+        String path = jarFile.getAbsolutePath();
+        ClassLoader cached = loaders.get(path);
+        if (cached != null) return cached;
+        File opt = new File(context.getCacheDir(), "spider-dex");
+        if (!opt.exists()) opt.mkdirs();
+        ClassLoader loader = new dalvik.system.DexClassLoader(path, opt.getAbsolutePath(), null, JarSpiderHost.class.getClassLoader());
+        loaders.put(path, loader);
+        return loader;
+    }
+
+    private File downloadJar(String jar) throws Exception {
+        String url = jar.contains(";") ? jar.substring(0, jar.indexOf(';')) : jar;
+        File dir = new File(context.getCacheDir(), "spider-jars");
+        if (!dir.exists()) dir.mkdirs();
+        File out = new File(dir, Integer.toHexString(url.hashCode()) + ".jar");
+        if (out.exists() && out.length() > 0) return out;
+        try (Response res = OkHttp.newCall(url).execute()) {
+            if (res.body() == null) throw new IllegalStateException("empty jar body");
+            byte[] bytes = res.body().bytes();
+            try (OutputStream os = new FileOutputStream(out)) {
+                os.write(bytes);
+            }
+        }
+        return out;
+    }
+}
