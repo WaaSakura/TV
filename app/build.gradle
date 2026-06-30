@@ -52,6 +52,7 @@ android {
     // --- Yaxin Box: nodejs-mobile (embedded Node server) ---
     // Requires libnode.so (per ABI) in app/src/main/jniLibs/<abi>/ and node headers in
     // app/src/main/cpp/nodejs-mobile/include/node/ — see docs/SETUP_NODEJS_MOBILE.md.
+    ndkVersion "27.0.12077973"
     externalNativeBuild {
         cmake {
             path = "src/main/cpp/CMakeLists.txt"
@@ -62,7 +63,7 @@ android {
             jniLibs.srcDirs += 'src/main/jniLibs'
         }
     }
-    packagingOptions {
+    packaging {
         jniLibs {
             useLegacyPackaging = true
             pickFirsts += ['**/libnode.so', '**/libnative-lib.so']

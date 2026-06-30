@@ -11,3 +11,8 @@ lib-*.aar
 /docs
 # Yaxin Box embedded server bundle (regenerate via scripts/bundle-server-for-android.sh)
 app/src/main/assets/nodejs-project/
+
+# Yaxin Box: nodejs-mobile native binaries + headers (fetched at build time)
+app/src/main/jniLibs/*/libnode.so
+app/src/main/cpp/nodejs-mobile/
+ci.keystore
