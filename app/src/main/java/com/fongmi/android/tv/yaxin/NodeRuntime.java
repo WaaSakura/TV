@@ -19,9 +19,9 @@ import java.io.OutputStream;
 public final class NodeRuntime {
 
     static {
-        // Provided by nodejs-mobile integration (names depend on the chosen artifact).
+        // libnode.so from nodejs-mobile, then our JNI bridge (src/main/cpp/native-lib.cpp).
         System.loadLibrary("node");
-        System.loadLibrary("nodejs-mobile");
+        System.loadLibrary("native-lib");
     }
 
     private static volatile boolean started = false;
@@ -29,14 +29,16 @@ public final class NodeRuntime {
     /** JNI entry implemented by the nodejs-mobile native helper. */
     public static native int startNodeWithArguments(String[] arguments);
 
-    public static synchronized void start(Context context) {
+    public static synchronized void start(Context context, String spiderBridgeBase) {
         if (started) return;
         started = true;
         File projectDir = new File(context.getFilesDir(), "nodejs-project");
         // Copy the bundled project out of (read-only) assets to a writable dir on first run.
         copyAssetDir(context, "nodejs-project", projectDir);
         File main = new File(projectDir, "main.js");
-        new Thread(() -> startNodeWithArguments(new String[]{"node", main.getAbsolutePath()}),
+        String bridge = spiderBridgeBase == null ? "" : spiderBridgeBase;
+        // arg[2] = spider bridge base; main.js maps it to YAXIN_BOX_SPIDER_BRIDGE_BASE.
+        new Thread(() -> startNodeWithArguments(new String[]{"node", main.getAbsolutePath(), bridge}),
                 "yaxin-node").start();
     }
 

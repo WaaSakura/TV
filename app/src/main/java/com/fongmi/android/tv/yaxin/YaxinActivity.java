@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.fongmi.android.tv.server.Server;
 import com.github.catvod.net.OkHttp;
 
 import okhttp3.Response;
@@ -32,7 +33,11 @@ public class YaxinActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NodeRuntime.start(getApplicationContext());
+        // Start FongMi's local server (hosts the SpiderApi bridge for native spiders) first,
+        // then boot our Node server pointed at it so csp_ sources bridge automatically.
+        Server.get().start();
+        String bridgeBase = "spider://127.0.0.1:" + com.github.catvod.Proxy.getPort() + "/spider";
+        NodeRuntime.start(getApplicationContext(), bridgeBase);
 
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);

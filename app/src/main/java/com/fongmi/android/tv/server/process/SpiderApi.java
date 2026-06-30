@@ -2,7 +2,10 @@ package com.fongmi.android.tv.server.process;
 
 import android.text.TextUtils;
 
+import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.api.loader.BaseLoader;
+import com.fongmi.android.tv.bean.Config;
+import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.server.Nano;
 import com.fongmi.android.tv.server.impl.Process;
 import com.github.catvod.crawler.Spider;
@@ -50,6 +53,14 @@ public class SpiderApi implements Process {
     @Override
     public Response doResponse(IHTTPSession session, String url, Map<String, String> files) {
         String path = url.substring(PREFIX.length());
+        // Control route: load a TVBox config URL into VodConfig so getSpider(key) resolves
+        // (sites known + jars parsed). The Yaxin Box server calls this once per subscription.
+        if (path.equals("_load")) {
+            String configUrl = str(session.getParms(), "url");
+            if (TextUtils.isEmpty(configUrl)) return Nano.error(Response.Status.BAD_REQUEST, "missing url");
+            VodConfig.load(Config.create(0, configUrl), new Callback());
+            return json("{\"ok\":true}");
+        }
         int slash = path.lastIndexOf('/');
         if (slash < 1) return Nano.error(Response.Status.BAD_REQUEST, "bad path");
         String key = decode(path.substring(0, slash));
