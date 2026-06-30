@@ -80,3 +80,8 @@
 -keep class com.google.zxing.qrcode.QRCodeReader { *; }
 -keep class com.google.zxing.qrcode.QRCodeWriter { *; }
 -keep class com.google.zxing.qrcode.decoder.ErrorCorrectionLevel { *; }
+
+# Yaxin Box: keep JNI bridge (native method resolved by name) + app classes.
+-keep class com.fongmi.android.tv.yaxin.** { *; }
+-keepclasseswithmembernames class * { native <methods>; }
+-keep class com.fongmi.android.tv.server.process.SpiderApi { *; }
