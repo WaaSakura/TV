@@ -1,0 +1,10 @@
+// Minimal root build for the lean Yaxin Box build (see settings-lite.gradle).
+// The real build.gradle references project(':app'), which the lite build excludes.
+plugins {
+    alias libs.plugins.android.application apply false
+    alias libs.plugins.android.library apply false
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
+}
