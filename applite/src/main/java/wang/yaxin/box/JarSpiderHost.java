@@ -38,6 +38,12 @@ public final class JarSpiderHost {
         ClassLoader loader = loaderFor(jarFile);
         String className = api.startsWith("csp_") ? "com.github.catvod.spider." + api.substring(4) : api;
         Spider spider = (Spider) loader.loadClass(className).getDeclaredConstructor().newInstance();
+        // FongMi sets siteKey before init; some spiders (Guard/DexNative variants)
+        // read it during init. Best-effort — field is public on the catvod base.
+        try {
+            spider.getClass().getField("siteKey").set(spider, key);
+        } catch (Throwable ignored) {
+        }
         spider.init(context, ext == null ? "" : ext);
         spiders.put(key, spider);
         return spider;
@@ -45,6 +51,16 @@ public final class JarSpiderHost {
 
     public Spider get(String key) {
         return spiders.get(key);
+    }
+
+    /** Call the jar's own com.github.catvod.spider.Init.init(Context) if present. */
+    private void invokeJarInit(ClassLoader loader) {
+        try {
+            Class<?> init = loader.loadClass("com.github.catvod.spider.Init");
+            init.getMethod("init", Context.class).invoke(null, context);
+        } catch (Throwable ignored) {
+            // Not all jars ship an Init; pure-Java spiders don't need it.
+        }
     }
 
     private ClassLoader loaderFor(File jarFile) {
@@ -58,6 +74,10 @@ public final class JarSpiderHost {
         File opt = new File(context.getCacheDir(), "spider-dex");
         if (!opt.exists()) opt.mkdirs();
         ClassLoader loader = new dalvik.system.DexClassLoader(path, opt.getAbsolutePath(), null, JarSpiderHost.class.getClassLoader());
+        // FongMi's JarLoader calls the jar's own Init.init(Context) right after
+        // loading, once per jar. Guard/DexNative spiders (e.g. the .jpg-disguised
+        // jars) NPE in their static init without this global context set up.
+        invokeJarInit(loader);
         loaders.put(path, loader);
         return loader;
     }
