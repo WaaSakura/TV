@@ -28,10 +28,12 @@ public class SpiderHttpServer extends NanoHTTPD {
 
     private static final String PREFIX = "/spider/";
     private final JarSpiderHost host;
+    private final WebSniffer sniffer;
 
     public SpiderHttpServer(int port, JarSpiderHost host) {
         super(port);
         this.host = host;
+        this.sniffer = new WebSniffer(host.context());
     }
 
     @Override
@@ -44,6 +46,15 @@ public class SpiderHttpServer extends NanoHTTPD {
             if (path.equals("_register")) {
                 host.register(req(p, "key"), req(p, "api"), p.get("ext"), req(p, "jar"));
                 return json("{\"ok\":true}");
+            }
+            if (path.equals("_sniff")) {
+                // Resolve a parse-required web page to a real media URL via a hidden WebView.
+                String page = req(p, "url");
+                long timeout = 15000;
+                try { if (p.get("timeout") != null) timeout = Long.parseLong(p.get("timeout")); } catch (Exception ignored) {}
+                String real = sniffer.sniff(page, WebSniffer.parseHeaders(p.get("headers")), timeout);
+                if (real == null || real.isEmpty()) return error(Response.Status.NOT_FOUND, "sniff_no_media");
+                return json("{\"url\":" + JSONObject.quote(real) + "}");
             }
             int slash = path.lastIndexOf('/');
             if (slash < 1) return error(Response.Status.BAD_REQUEST, "bad_path");

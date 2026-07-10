@@ -53,6 +53,10 @@ public final class JarSpiderHost {
         return spiders.get(key);
     }
 
+    public Context context() {
+        return context;
+    }
+
     /** Call the jar's own com.github.catvod.spider.Init.init(Context) if present. */
     private void invokeJarInit(ClassLoader loader) {
         try {
