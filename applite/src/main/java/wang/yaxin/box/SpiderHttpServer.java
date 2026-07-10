@@ -39,6 +39,12 @@ public class SpiderHttpServer extends NanoHTTPD {
     @Override
     public Response serve(IHTTPSession session) {
         String uri = session.getUri();
+        // catvod local proxy: spiders emit http://127.0.0.1:PORT/proxy?do=m3u8&url=…
+        // and expect Spider.proxy(params) to serve the (header-injected, rewritten)
+        // stream. Route those here, outside the /spider/ contract.
+        if (uri != null && uri.startsWith("/proxy")) {
+            return proxy(session);
+        }
         if (uri == null || !uri.startsWith(PREFIX)) return json("{}");
         Map<String, String> p = session.getParms();
         String path = uri.substring(PREFIX.length());
@@ -68,7 +74,10 @@ public class SpiderHttpServer extends NanoHTTPD {
                 case "category" -> body = spider.categoryContent(str(p, "tid"), str(p, "pg", "1"), bool(p, "filter", false), extend(p.get("extend")));
                 case "detail" -> body = spider.detailContent(Arrays.asList(str(p, "ids").split(",")));
                 case "search" -> body = search(spider, str(p, "wd"), bool(p, "quick", false), str(p, "pg", "1"));
-                case "play" -> body = spider.playerContent(str(p, "flag"), str(p, "id"), Collections.emptyList());
+                case "play" -> {
+                    host.setRecent(key); // route later local-proxy calls to this spider
+                    body = spider.playerContent(str(p, "flag"), str(p, "id"), Collections.emptyList());
+                }
                 default -> {
                     return error(Response.Status.NOT_FOUND, "no_action");
                 }
@@ -76,6 +85,31 @@ public class SpiderHttpServer extends NanoHTTPD {
             return json(body == null || body.isEmpty() ? "{}" : body);
         } catch (Throwable e) {
             return error(Response.Status.INTERNAL_ERROR, e.getMessage() == null ? "spider_error" : e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Response proxy(IHTTPSession session) {
+        try {
+            Map<String, String> params = new HashMap<>(session.getParms());
+            params.putAll(session.getHeaders());
+            Object[] rs = host.proxy(params);
+            if (rs == null || rs.length < 3) return error(Response.Status.INTERNAL_ERROR, "proxy_no_result");
+            int code = rs[0] instanceof Integer ? (Integer) rs[0] : 200;
+            String type = rs[1] instanceof String ? (String) rs[1] : "application/octet-stream";
+            java.io.InputStream stream = (java.io.InputStream) rs[2];
+            Response.IStatus status = Response.Status.lookup(code);
+            if (status == null) status = Response.Status.OK;
+            Response response = newChunkedResponse(status, type, stream);
+            if (rs.length > 3 && rs[3] instanceof Map) {
+                for (Map.Entry<String, String> e : ((Map<String, String>) rs[3]).entrySet()) {
+                    response.addHeader(e.getKey(), e.getValue());
+                }
+            }
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        } catch (Throwable e) {
+            return error(Response.Status.INTERNAL_ERROR, e.getMessage() == null ? "proxy_error" : e.getMessage());
         }
     }
 

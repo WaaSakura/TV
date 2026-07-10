@@ -25,9 +25,33 @@ public final class JarSpiderHost {
     private final Context context;
     private final Map<String, Spider> spiders = new ConcurrentHashMap<>();
     private final Map<String, ClassLoader> loaders = new ConcurrentHashMap<>();
+    // Last spider whose playerContent() ran — the catvod local proxy (do=m3u8…)
+    // has no site key in its URL, so route those requests to the recent spider.
+    private volatile String recentKey;
 
     public JarSpiderHost(Context context) {
         this.context = context.getApplicationContext();
+    }
+
+    public void setRecent(String key) {
+        this.recentKey = key;
+    }
+
+    /**
+     * catvod local-proxy call: spiders build http://127.0.0.1:PORT/proxy?do=… URLs
+     * and expect the host to invoke Spider.proxy(params). Returns catvod's
+     * {code, contentType, InputStream[, headers]} tuple, or null.
+     */
+    public Object[] proxy(Map<String, String> params) throws Exception {
+        Spider spider = null;
+        String siteKey = params.get("siteKey");
+        if (siteKey != null) spider = spiders.get(siteKey);
+        if (spider == null && recentKey != null) spider = spiders.get(recentKey);
+        if (spider == null) {
+            for (Spider s : spiders.values()) { spider = s; break; }
+        }
+        if (spider == null) return null;
+        return spider.proxy(params);
     }
 
     /** api e.g. "csp_XiaoYa"; jar e.g. "http://host/spider.jar;md5;abc" (suffix ignored). */

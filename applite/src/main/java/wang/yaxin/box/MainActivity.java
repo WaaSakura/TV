@@ -42,6 +42,11 @@ public class MainActivity extends Activity {
         try {
             spiderServer = new SpiderHttpServer(SPIDER_PORT, host);
             spiderServer.start(SOCKET_READ_TIMEOUT, true);
+            // Tell catvod spiders where our local proxy lives, so their play() URLs
+            // (http://127.0.0.1:PORT/proxy?do=m3u8&url=…) point at a running server
+            // that injects the site headers + rewrites the m3u8. Must be set before
+            // any spider runs.
+            com.github.catvod.Proxy.set(SPIDER_PORT);
         } catch (Exception ignored) {
         }
         NodeRuntime.start(getApplicationContext(), "spider://127.0.0.1:" + SPIDER_PORT + "/spider");
