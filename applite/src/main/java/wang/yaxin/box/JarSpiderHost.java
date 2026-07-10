@@ -51,6 +51,10 @@ public final class JarSpiderHost {
         String path = jarFile.getAbsolutePath();
         ClassLoader cached = loaders.get(path);
         if (cached != null) return cached;
+        // Android 14+ (API 34) enforces W^X on DexClassLoader: a writable dex is
+        // rejected with "Writable dex file ... is not allowed". Mark the jar
+        // read-only before loading, exactly as FongMi's JarLoader does.
+        jarFile.setReadOnly();
         File opt = new File(context.getCacheDir(), "spider-dex");
         if (!opt.exists()) opt.mkdirs();
         ClassLoader loader = new dalvik.system.DexClassLoader(path, opt.getAbsolutePath(), null, JarSpiderHost.class.getClassLoader());
