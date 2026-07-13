@@ -62,6 +62,11 @@ public class MainActivity extends Activity {
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
+        // Hand playback to the native ExoPlayer: this device's WebView can be an
+        // ancient Chromium whose <video> can't decode spider streams. The web UI
+        // feature-detects window.YaxinNativePlayer and, when present, calls
+        // .play(url, headersJson, title) instead of mounting its own <video>.
+        webView.addJavascriptInterface(new NativePlayerBridge(this), "YaxinNativePlayer");
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {

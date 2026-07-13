@@ -65,5 +65,14 @@ android {
 dependencies {
     implementation project(':catvod')   // real com.github.catvod.crawler.Spider runtime
     implementation libs.nanohttpd
+    // Native player: the device WebView can be ancient (a Sony Walkman ships
+    // Chromium 66) and its <video> can't decode many spider streams. Hand the
+    // resolved URL + per-source headers to ExoPlayer (media3) instead, which
+    // plays mp4/HLS/DASH with request headers the WebView never applies.
+    def media3 = '1.5.1'
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
     coreLibraryDesugaring libs.desugar
 }
