@@ -29,7 +29,13 @@ public class MainActivity extends Activity {
     private static final String HEALTH_URL = "http://127.0.0.1:29978/health";
 
     private WebView webView;
-    private SpiderHttpServer spiderServer;
+    // The spider bridge is a process-lifetime singleton, like the Node runtime it
+    // serves — NOT tied to the Activity. If it were an instance field started in
+    // onCreate/stopped in onDestroy, an Activity recreate (a config change we don't
+    // handle: density/fontScale/locale…) would stop it and fail to rebind port
+    // 27777, leaving every spider call as a connection error until the app restarts.
+    private static SpiderHttpServer spiderServer;
+    private static boolean spiderStarted = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -38,17 +44,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         Init.set(getApplicationContext()); // initialise catvod runtime (OkHttp, etc.)
 
-        JarSpiderHost host = new JarSpiderHost(getApplicationContext());
-        try {
-            spiderServer = new SpiderHttpServer(SPIDER_PORT, host);
-            spiderServer.start(SOCKET_READ_TIMEOUT, true);
-            // Tell catvod spiders where our local proxy lives, so their play() URLs
-            // (http://127.0.0.1:PORT/proxy?do=m3u8&url=…) point at a running server
-            // that injects the site headers + rewrites the m3u8. Must be set before
-            // any spider runs.
-            com.github.catvod.Proxy.set(SPIDER_PORT);
-        } catch (Exception ignored) {
-        }
+        startSpiderBridgeOnce(getApplicationContext());
         NodeRuntime.start(getApplicationContext(), "spider://127.0.0.1:" + SPIDER_PORT + "/spider");
 
         webView = new WebView(this);
@@ -127,6 +123,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static synchronized void startSpiderBridgeOnce(android.content.Context context) {
+        if (spiderStarted) return;
+        try {
+            JarSpiderHost host = new JarSpiderHost(context);
+            spiderServer = new SpiderHttpServer(SPIDER_PORT, host);
+            spiderServer.start(SOCKET_READ_TIMEOUT, true);
+            // Tell catvod spiders where our local proxy lives, so their play() URLs
+            // (http://127.0.0.1:PORT/proxy?do=m3u8&url=…) point at a running server
+            // that injects the site headers + rewrites the m3u8. Must be set before
+            // any spider runs.
+            com.github.catvod.Proxy.set(SPIDER_PORT);
+            spiderStarted = true;
+        } catch (Exception ignored) {
+        }
+    }
+
     @Override
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) webView.goBack();
@@ -135,7 +147,9 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (spiderServer != null) spiderServer.stop();
+        // Deliberately do NOT stop the spider bridge here — it's a process-lifetime
+        // singleton shared with the still-running Node server. It dies with the
+        // process. Stopping it on Activity destroy is what broke playback on recreate.
         super.onDestroy();
     }
 
