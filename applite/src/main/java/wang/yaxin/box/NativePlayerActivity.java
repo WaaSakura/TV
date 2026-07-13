@@ -22,7 +22,7 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
-import androidx.media3.datasource.okhttp.OkHttpDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
@@ -33,11 +33,6 @@ import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
 
 /**
  * Native fullscreen player. The web UI resolves a stream (direct URL + the
@@ -202,7 +197,9 @@ public class NativePlayerActivity extends Activity {
             else requestProps.put(e.getKey(), e.getValue());
         }
 
-        OkHttpDataSource.Factory httpFactory = new OkHttpDataSource.Factory(buildHttpClient());
+        DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(true)
+                .setKeepPostFor302Redirects(true);
         if (!requestProps.isEmpty()) httpFactory.setDefaultRequestProperties(requestProps);
         if (!TextUtils.isEmpty(userAgent)) httpFactory.setUserAgent(userAgent);
 
@@ -258,33 +255,6 @@ public class NativePlayerActivity extends Activity {
         if (c >= 3000 && c < 4000) return "该视频封装格式无法解析。";
         if (c >= 4000 && c < 5000) return "解码失败：设备可能不支持该视频编码。";
         return "播放失败（" + e.getErrorCodeName() + "）。";
-    }
-
-    // OkHttp follows redirects itself; a network interceptor runs once per hop.
-    // When a hop lands on a different host than the call's original request (i.e.
-    // we followed a redirect off-origin), strip the origin-scoped headers. This
-    // fixes cloud/alist links (list.host → 302 → CDN that 403s the origin Referer)
-    // WITHOUT breaking sources like BiliBili, whose cross-host Referer sits on the
-    // initial request (same host as the call) and must be kept.
-    private static OkHttpClient buildHttpClient() {
-        return new OkHttpClient.Builder()
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .addNetworkInterceptor(chain -> {
-                    Request req = chain.request();
-                    HttpUrl origin = chain.call().request().url();
-                    if (!req.url().host().equals(origin.host())) {
-                        req = req.newBuilder()
-                                .removeHeader("Referer")
-                                .removeHeader("Cookie")
-                                .removeHeader("Origin")
-                                .build();
-                    }
-                    return chain.proceed(req);
-                })
-                .build();
     }
 
     // Extensionless URLs are common; MIME hints let DefaultMediaSourceFactory
