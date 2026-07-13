@@ -1,3 +1,5 @@
+// Lean build: the Yaxin Box app shell on top of FongMi's :catvod spider runtime only.
+// Use with:  ./gradlew -c settings-lite.gradle :applite:assembleDebug
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -15,13 +17,10 @@ dependencyResolutionManagement {
     repositories {
         mavenCentral()
         google()
-        flatDir { dirs "$rootDir/app/libs" }
         maven { url = "https://jitpack.io" }
     }
 }
 
-include ':app'
+include ':applite'
 include ':catvod'
-include ':chaquo'
-include ':quickjs'
 rootProject.name = "TV"
