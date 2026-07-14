@@ -23,6 +23,8 @@ import fi.iki.elonen.NanoHTTPD;
  *   GET  /spider/{key}/detail?ids=
  *   GET  /spider/{key}/search?wd=&pg=&quick=
  *   GET  /spider/{key}/play?flag=&id=
+ *   GET  /spider/{key}/action?value=      Spider.action(value) — login/QR flows;
+ *                                         returns a Result JSON whose `msg` is HTML.
  */
 public class SpiderHttpServer extends NanoHTTPD {
 
@@ -78,6 +80,11 @@ public class SpiderHttpServer extends NanoHTTPD {
                     host.setRecent(key); // route later local-proxy calls to this spider
                     body = spider.playerContent(str(p, "flag"), str(p, "id"), Collections.emptyList());
                 }
+                // Login / QR flows: FongMi drives these via Spider.action(value) and
+                // renders the returned Result's `msg` (HTML) in a dialog, polling until
+                // the spider stores its cookie. We expose the same passthrough; the web
+                // UI renders the msg HTML and polls this endpoint.
+                case "action" -> body = spider.action(str(p, "value"));
                 default -> {
                     return error(Response.Status.NOT_FOUND, "no_action");
                 }
