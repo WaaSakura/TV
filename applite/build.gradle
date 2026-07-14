@@ -16,7 +16,8 @@ android {
         targetSdk libs.versions.targetSdk.get().toInteger()
         versionCode 1
         versionName '0.1.0'
-        ndk { abiFilters 'arm64-v8a' }
+        // arm64-v8a for real devices; x86_64 so the app runs natively on x86_64 emulators.
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
         // libnode.so needs libc++_shared.so at runtime — build with the shared STL so
         // the NDK's libc++_shared.so is packaged into the APK.
         externalNativeBuild {
